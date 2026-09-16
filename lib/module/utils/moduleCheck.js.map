@@ -1,1 +1,0 @@
-{"version":3,"names":["NativeModule","assertNativeModuleAvailable","Error"],"sourceRoot":"../../../src","sources":["utils/moduleCheck.ts"],"mappings":";;AAAA,OAAOA,YAAY,MAAM,gCAA6B;;AAEtD;AACA;AACA;AACA;AACA,OAAO,SAASC,2BAA2BA,CAAA,EAAS;EAClD,IAAI,CAACD,YAAY,EAAE;IACjB,MAAM,IAAIE,KAAK,CACb,qDAAqD,GACnD,qEACJ,CAAC;EACH;AACF","ignoreList":[]}

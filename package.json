@@ -2,19 +2,10 @@
   "name": "@cashify/rn-background-location-sync",
   "version": "0.1.0",
   "description": "React Native library for background location tracking using TurboModules. Track user location even when the app is minimized or in the background.",
-  "main": "./lib/module/index.js",
-  "types": "./lib/typescript/src/index.d.ts",
-  "exports": {
-    ".": {
-      "source": "./src/index.tsx",
-      "types": "./lib/typescript/src/index.d.ts",
-      "default": "./lib/module/index.js"
-    },
-    "./package.json": "./package.json"
-  },
+  "main": "./src/index.tsx",
+  "types": "./src/index.tsx",
   "files": [
     "src",
-    "lib",
     "android",
     "ios",
     "cpp",
@@ -32,7 +23,6 @@
     "!**/.*"
   ],
   "scripts": {
-    "build": "bob build",
     "test": "jest",
     "typecheck": "tsc"
   },
