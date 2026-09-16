@@ -1,0 +1,1 @@
+{"version":3,"file":"GeofenceError.d.ts","sourceRoot":"","sources":["../../../../src/errors/GeofenceError.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,iBAAiB,EAAE,MAAM,qBAAqB,CAAC;AAExD;;;;;;;;;;;;;;;;;GAiBG;AACH,qBAAa,aAAc,SAAQ,KAAK;IACtC,IAAI,EAAE,iBAAiB,CAAC;gBAEZ,IAAI,EAAE,iBAAiB,EAAE,OAAO,EAAE,MAAM;CAMrD"}

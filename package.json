@@ -32,6 +32,7 @@
     "!**/.*"
   ],
   "scripts": {
+    "build": "bob build",
     "test": "jest",
     "typecheck": "tsc"
   },
