@@ -1,0 +1,157 @@
+{
+  "name": "@cashify/rn-background-location-sync",
+  "version": "0.1.0",
+  "description": "React Native library for background location tracking using TurboModules. Track user location even when the app is minimized or in the background.",
+  "main": "./lib/module/index.js",
+  "types": "./lib/typescript/src/index.d.ts",
+  "exports": {
+    ".": {
+      "source": "./src/index.tsx",
+      "types": "./lib/typescript/src/index.d.ts",
+      "default": "./lib/module/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "lib",
+    "android",
+    "ios",
+    "cpp",
+    "*.podspec",
+    "react-native.config.js",
+    "!ios/build",
+    "!android/build",
+    "!android/gradle",
+    "!android/gradlew",
+    "!android/gradlew.bat",
+    "!android/local.properties",
+    "!**/__tests__",
+    "!**/__fixtures__",
+    "!**/__mocks__",
+    "!**/.*"
+  ],
+  "scripts": {
+    "test": "jest",
+    "typecheck": "tsc"
+  },
+  "keywords": [
+    "react-native",
+    "react-native-background-location",
+    "location",
+    "gps",
+    "tracking",
+    "background-location",
+    "background-tracking",
+    "geolocation",
+    "coordinate",
+    "latitude",
+    "longitude",
+    "trip",
+    "session",
+    "turbo-module",
+    "turbomodule",
+    "new-architecture",
+    "location-service",
+    "foreground-service",
+    "android",
+    "ios",
+    "typescript",
+    "hooks",
+    "useBackgroundLocation",
+    "useLocationUpdates",
+    "real-time",
+    "event-driven",
+    "location-updates",
+    "persistent-storage",
+    "location-permissions"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gabriel-sisjr/react-native-background-location.git"
+  },
+  "author": "Gabriel Santana <gabriel.sistemasjr@gmail.com> (https://github.com/gabriel-sisjr)",
+  "license": "MIT",
+  "sideEffects": false,
+  "bugs": {
+    "url": "https://github.com/gabriel-sisjr/react-native-background-location/issues"
+  },
+  "homepage": "https://gabriel-sisjr.github.io/react-native-background-location/",
+  "devDependencies": {
+    "@react-native/babel-preset": "0.84.1",
+    "@testing-library/react-native": "^13.3.3",
+    "@types/jest": "^29.5.14",
+    "@types/react": "^19.2.14",
+    "jest": "^30.3.0",
+    "react": "19.2.4",
+    "react-native": "0.84.1",
+    "react-native-builder-bob": "^0.40.18",
+    "react-test-renderer": "19.2.4",
+    "typescript": "^6.0.2"
+  },
+  "peerDependencies": {
+    "react": ">=18.2.0",
+    "react-native": ">=0.73.0"
+  },
+  "jest": {
+    "preset": "react-native",
+    "setupFilesAfterEnv": [
+      "<rootDir>/src/__tests__/setup-minimal.ts"
+    ],
+    "modulePathIgnorePatterns": [
+      "<rootDir>/lib/"
+    ],
+    "testMatch": [
+      "<rootDir>/src/__tests__/**/*.test.{js,ts,tsx}"
+    ],
+    "collectCoverageFrom": [
+      "src/**/*.{js,ts,tsx}",
+      "!src/__tests__/**",
+      "!src/**/*.d.ts"
+    ],
+    "coverageReporters": [
+      "json-summary",
+      "lcov",
+      "text"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "branches": 0,
+        "functions": 0,
+        "lines": 0,
+        "statements": 0
+      }
+    }
+  },
+  "react-native-builder-bob": {
+    "source": "src",
+    "output": "lib",
+    "targets": [
+      [
+        "module",
+        {
+          "esm": true
+        }
+      ],
+      [
+        "typescript",
+        {
+          "project": "tsconfig.build.json"
+        }
+      ]
+    ]
+  },
+  "codegenConfig": {
+    "name": "BackgroundLocationSpec",
+    "type": "modules",
+    "jsSrcsDir": "src",
+    "android": {
+      "javaPackageName": "com.backgroundlocation"
+    }
+  },
+  "create-react-native-library": {
+    "languages": "kotlin-objc",
+    "type": "turbo-module",
+    "version": "0.54.7"
+  }
+}

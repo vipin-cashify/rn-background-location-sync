@@ -1,0 +1,70 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+  xmlns:tools="http://schemas.android.com/tools">
+
+  <!-- Location permissions -->
+  <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+  <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+  <!-- Background location permission for Android 10+ -->
+  <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+
+  <!-- Foreground service permission for Android 9+ -->
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+
+  <!-- Foreground service type for Android 10+ -->
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+
+  <!-- Notification permission for Android 13+ -->
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+  <!-- Boot completed permission for geofence recovery after reboot -->
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+  <!-- Network access for the bulk-upload sync layer (LocationSyncManager) -->
+  <uses-permission android:name="android.permission.INTERNET" />
+  <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+  <application>
+    <!-- Location tracking foreground service -->
+    <service
+      android:name=".LocationService"
+      android:enabled="true"
+      android:exported="false"
+      android:foregroundServiceType="location"
+      android:stopWithTask="false" />
+
+    <!-- Receiver for notification action button clicks -->
+    <receiver
+      android:name=".NotificationActionReceiver"
+      android:enabled="true"
+      android:exported="false" />
+
+    <!-- Receiver for geofence transition events -->
+    <receiver
+      android:name=".GeofenceBroadcastReceiver"
+      android:enabled="true"
+      android:exported="false" />
+
+    <!-- Receiver for restoring geofences after device reboot -->
+    <receiver
+      android:name=".BootCompletedReceiver"
+      android:enabled="true"
+      android:exported="true">
+      <intent-filter>
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+      </intent-filter>
+    </receiver>
+
+    <!--
+      WorkManager SystemForegroundService override.
+      Required for Android 14+ when RecoveryWorker uses setForeground()
+      with FOREGROUND_SERVICE_TYPE_LOCATION.
+      Without this, the app crashes with IllegalArgumentException.
+    -->
+    <service
+      android:name="androidx.work.impl.foreground.SystemForegroundService"
+      android:foregroundServiceType="location"
+      tools:node="merge" />
+  </application>
+
+</manifest>

@@ -1,0 +1,426 @@
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { NativeEventEmitter, AppState } from 'react-native';
+import BackgroundLocationModule from '../NativeBackgroundLocation';
+import type {
+  UseLocationUpdatesOptions,
+  UseLocationUpdatesResult,
+  Coords,
+  LocationUpdateEvent,
+  LocationWarningEvent,
+  NotificationActionEvent,
+} from '../types';
+import { extractDefinedProperties } from '../utils/objectUtils';
+
+// Check if native module is available
+const isNativeModuleAvailable = () => {
+  try {
+    // Check if methods are available (works with Proxy mocks)
+    // This must be checked first before checking if module exists
+    if (typeof BackgroundLocationModule?.isTracking !== 'function') {
+      return false;
+    }
+    // Check if module exists and is not null
+    if (!BackgroundLocationModule || BackgroundLocationModule === null) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Hook to watch location updates in real-time
+ *
+ * This hook automatically listens for location updates from the background service
+ * and provides them as they arrive, without requiring manual refresh.
+ *
+ * @param options - Configuration options
+ *
+ * @example
+ * ```tsx
+ * function LiveTrackingMap() {
+ *   const {
+ *     locations,
+ *     lastLocation,
+ *     isTracking
+ *   } = useLocationUpdates({
+ *     onLocationUpdate: (location) => {
+ *       console.log('New location:', location);
+ *     },
+ *   });
+ *
+ *   return (
+ *     <View>
+ *       <Text>Tracking: {isTracking ? 'Active' : 'Inactive'}</Text>
+ *       <Text>Locations collected: {locations.length}</Text>
+ *       {lastLocation && (
+ *         <Text>
+ *           Last: {lastLocation.latitude}, {lastLocation.longitude}
+ *         </Text>
+ *       )}
+ *     </View>
+ *   );
+ * }
+ * ```
+ */
+export function useLocationUpdates(
+  options: UseLocationUpdatesOptions = {}
+): UseLocationUpdatesResult {
+  const {
+    tripId: providedTripId,
+    onLocationUpdate,
+    onLocationWarning,
+    onNotificationAction,
+    onUpdateInterval,
+    autoLoad = true,
+  } = options;
+
+  const [tripId, setTripId] = useState<string | null>(providedTripId || null);
+  const [isTracking, setIsTracking] = useState(false);
+  const [locations, setLocations] = useState<Coords[]>([]);
+  const [lastLocation, setLastLocation] = useState<Coords | null>(null);
+  const [lastWarning, setLastWarning] = useState<LocationWarningEvent | null>(
+    null
+  );
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  const wasClearedRef = useRef(false);
+  const hasHydratedRef = useRef(false);
+  const appStateRef = useRef(AppState.currentState);
+  const lastCallbackTimeRef = useRef<number>(0);
+
+  const onLocationUpdateRef = useRef(onLocationUpdate);
+  onLocationUpdateRef.current = onLocationUpdate;
+
+  const onLocationWarningRef = useRef(onLocationWarning);
+  onLocationWarningRef.current = onLocationWarning;
+
+  const onNotificationActionRef = useRef(onNotificationAction);
+  onNotificationActionRef.current = onNotificationAction;
+
+  /**
+   * Clear error state
+   */
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
+  /**
+   * Clear all locations for current trip
+   */
+  const clearLocations = useCallback(async (): Promise<void> => {
+    if (!tripId) {
+      return;
+    }
+
+    if (!isNativeModuleAvailable()) {
+      setLocations([]);
+      setLastLocation(null);
+      wasClearedRef.current = true;
+      console.warn('BackgroundLocation not available');
+      return;
+    }
+
+    setIsLoading(true);
+    clearError();
+
+    try {
+      await BackgroundLocationModule.clearTrip(tripId);
+      setLocations([]);
+      setLastLocation(null);
+      wasClearedRef.current = true;
+    } catch (err) {
+      const clearError_instance =
+        err instanceof Error ? err : new Error('Failed to clear locations');
+      setError(clearError_instance);
+      console.error('Error clearing locations:', clearError_instance);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [tripId, clearError]);
+
+  /**
+   * Load existing locations for a trip
+   */
+  const loadExistingLocations = useCallback(
+    async (loadTripId: string) => {
+      if (!isNativeModuleAvailable()) {
+        return;
+      }
+
+      setIsLoading(true);
+      clearError();
+
+      try {
+        const locs = await BackgroundLocationModule.getLocations(loadTripId);
+        setLocations(locs);
+        if (locs.length > 0) {
+          const lastLoc = locs[locs.length - 1];
+          if (lastLoc) {
+            setLastLocation(lastLoc);
+          }
+        }
+      } catch (err) {
+        const loadError =
+          err instanceof Error
+            ? err
+            : new Error('Failed to load existing locations');
+        setError(loadError);
+        console.error('Error loading locations:', loadError);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [clearError]
+  );
+
+  /**
+   * Manually refresh locations from the database.
+   * Resets the wasClearedRef flag to allow future re-hydrations.
+   * No-op if no tripId is currently set.
+   */
+  const refreshLocations = useCallback(async (): Promise<void> => {
+    if (!tripId) {
+      return;
+    }
+    wasClearedRef.current = false;
+    await loadExistingLocations(tripId);
+  }, [tripId, loadExistingLocations]);
+
+  /**
+   * Check tracking status and setup initial state
+   */
+  useEffect(() => {
+    const checkStatus = async () => {
+      if (!isNativeModuleAvailable()) {
+        console.warn(
+          'BackgroundLocation not available - running in simulator or module not linked?'
+        );
+        return;
+      }
+
+      try {
+        const status = await BackgroundLocationModule.isTracking();
+        setIsTracking((prev) =>
+          prev === status.active ? prev : status.active
+        );
+
+        // If we have a provided tripId, use it; otherwise use the active one
+        const effectiveTripId = providedTripId || status.tripId;
+
+        if (effectiveTripId) {
+          setTripId((prev) =>
+            prev === effectiveTripId ? prev : effectiveTripId
+          );
+
+          // Load existing locations only on initial hydration (mount)
+          // Subsequent status checks (interval) skip DB reads to avoid overwriting
+          // real-time NativeEventEmitter data with stale batched-write DB content
+          if (!hasHydratedRef.current && autoLoad && !wasClearedRef.current) {
+            await loadExistingLocations(effectiveTripId);
+            hasHydratedRef.current = true;
+          }
+        }
+      } catch (err) {
+        console.error('Error checking tracking status:', err);
+      }
+    };
+
+    checkStatus();
+
+    // Re-check status periodically (every 5 seconds) to catch tracking changes
+    const interval = setInterval(() => {
+      checkStatus();
+    }, 5000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [providedTripId, autoLoad, loadExistingLocations]);
+
+  /**
+   * Listen for location update events
+   */
+  useEffect(() => {
+    if (!isNativeModuleAvailable()) {
+      return;
+    }
+
+    // Pass native module to NativeEventEmitter (required on iOS, optional on Android)
+    const eventEmitter = new NativeEventEmitter(
+      BackgroundLocationModule as any
+    );
+
+    const subscription = eventEmitter.addListener(
+      'onLocationUpdate',
+      (event: any) => {
+        const locationEvent = event as LocationUpdateEvent;
+
+        // Only process events for the trip we're watching (or all if no specific trip)
+        if (!tripId || locationEvent.tripId === tripId) {
+          // Extract all defined properties (both required and optional)
+          const newLocation = extractDefinedProperties(locationEvent) as Coords;
+
+          // Update trip ID if we weren't watching a specific one
+          if (!tripId && locationEvent.tripId) {
+            setTripId(locationEvent.tripId);
+            setIsTracking(true);
+          }
+
+          // If locations were cleared, start fresh (don't append to empty array)
+          // Otherwise, add to existing locations array
+          setLocations((prev) => {
+            // If was cleared, start fresh with just the new location
+            // Otherwise, append to existing array
+            if (wasClearedRef.current && prev.length === 0) {
+              wasClearedRef.current = false; // Reset cleared flag when new location arrives
+              return [newLocation];
+            }
+            return [...prev, newLocation];
+          });
+          setLastLocation(newLocation);
+
+          // Call callback if provided (with optional throttling)
+          if (onLocationUpdateRef.current) {
+            const now = Date.now();
+            if (
+              !onUpdateInterval ||
+              now - lastCallbackTimeRef.current >= onUpdateInterval
+            ) {
+              lastCallbackTimeRef.current = now;
+              onLocationUpdateRef.current(newLocation);
+            }
+          }
+        }
+      }
+    );
+
+    return () => {
+      subscription.remove();
+    };
+  }, [tripId, onUpdateInterval]);
+
+  /**
+   * Listen for location warning events (SERVICE_TIMEOUT, TASK_REMOVED, etc.)
+   */
+  useEffect(() => {
+    if (!isNativeModuleAvailable()) {
+      return;
+    }
+
+    const eventEmitter = new NativeEventEmitter(
+      BackgroundLocationModule as any
+    );
+
+    const warningSubscription = eventEmitter.addListener(
+      'onLocationWarning',
+      (event: any) => {
+        const warningEvent = event as LocationWarningEvent;
+        // Only process warnings for the trip we're watching (or all if no specific trip)
+        if (!tripId || warningEvent.tripId === tripId) {
+          setLastWarning(warningEvent);
+          onLocationWarningRef.current?.(warningEvent);
+        }
+      }
+    );
+
+    return () => {
+      warningSubscription.remove();
+    };
+  }, [tripId]);
+
+  /**
+   * Listen for notification action events
+   */
+  useEffect(() => {
+    if (!isNativeModuleAvailable()) {
+      return;
+    }
+
+    const eventEmitter = new NativeEventEmitter(
+      BackgroundLocationModule as any
+    );
+
+    const actionSubscription = eventEmitter.addListener(
+      'onNotificationAction',
+      (event: any) => {
+        const actionEvent = event as NotificationActionEvent;
+        if (!tripId || actionEvent.tripId === tripId) {
+          onNotificationActionRef.current?.(actionEvent);
+        }
+      }
+    );
+
+    return () => {
+      actionSubscription.remove();
+    };
+  }, [tripId]);
+
+  /**
+   * Reset state when trip changes
+   */
+  useEffect(() => {
+    if (providedTripId && providedTripId !== tripId) {
+      setTripId(providedTripId);
+      setLocations([]);
+      setLastLocation(null);
+      if (autoLoad) {
+        loadExistingLocations(providedTripId);
+      }
+    }
+  }, [providedTripId, tripId, autoLoad, loadExistingLocations]);
+
+  /**
+   * Re-hydrate locations from DB when app returns to foreground.
+   * Covers the rare scenario where the JS thread was destroyed (Activity/process killed)
+   * and state was lost. This is a one-shot operation, not periodic polling.
+   */
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      const previousState = appStateRef.current;
+      appStateRef.current = nextAppState;
+
+      if (
+        nextAppState === 'active' &&
+        (previousState === 'background' || previousState === 'inactive') &&
+        tripId &&
+        autoLoad &&
+        !wasClearedRef.current
+      ) {
+        loadExistingLocations(tripId);
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [tripId, autoLoad, loadExistingLocations]);
+
+  return useMemo(
+    () => ({
+      tripId,
+      isTracking,
+      locations,
+      lastLocation,
+      lastWarning,
+      isLoading,
+      error,
+      clearError,
+      clearLocations,
+      refreshLocations,
+    }),
+    [
+      tripId,
+      isTracking,
+      locations,
+      lastLocation,
+      lastWarning,
+      isLoading,
+      error,
+      clearError,
+      clearLocations,
+      refreshLocations,
+    ]
+  );
+}
