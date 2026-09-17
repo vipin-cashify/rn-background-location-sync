@@ -42,6 +42,13 @@ android {
       arg("room.schemaLocation", "$projectDir/schemas")
       arg("room.incremental", "true")
     }
+
+    // Consumer ProGuard/R8 rules: apps that minify (release builds) must keep this
+    // package, or R8 obfuscation breaks Room's reflective <Database>_Impl lookup and
+    // strips the TurboModule / foreground-service entry points — silently disabling
+    // location tracking in release while debug works. Shipping the rules here means
+    // every consuming app is protected automatically. See consumer-rules.pro.
+    consumerProguardFiles "consumer-rules.pro"
   }
 
   buildFeatures {
